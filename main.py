@@ -150,7 +150,10 @@ while running:
         and (flappy.rect.left > pipe_group.sprites()[0].rect.right):
         score +=1
         passed_pipe = False
-
+    if pygame.sprite.groupcollide(bird_group, pipe_group, False, False) or flappy.rect.top < 0 \
+        or flappy.rect.bottom >= 570:
+            Game_over = True
+            flying = False
     if Game_over:
         if Restart_button.draw():
             reset_game()
