@@ -1,0 +1,154 @@
+import pygame 
+import random
+pygame.init()
+
+W, H = 800, 600
+fps = 60
+white = (255, 255, 255)
+
+screen = pygame.display.set_mode((W, H))
+pygame.display.set_caption("Flappy Snowboarder") 
+
+font = pygame.font.SysFont("Bauhaus 93", 59)
+Bg = pygame.image.load("assets\Bg.png")
+ground_img = pygame.image.load("assets\snow.png")
+restart = pygame.image.load("assets\Restart.png")
+
+# Game variables
+ground_scroll = 0
+scroll_speed = 5
+snowboarding = False
+Game_over = False
+tree_gap = 120
+tree_freq = 1500
+last_tree = pygame.time.get_ticks() - tree_freq
+score = 0
+passed_tree = False
+
+# Game functions
+def draw_text(text, font, color, x, y):
+    screen.blit(font.render(text, True, color), (x, y))
+
+def reset_game():
+    tree_group.empty()
+    snowboarder.rect.center = (110, H // 2)
+    global score, passed_tree
+    score = 0
+    passed_tree = False
+    return score
+
+class Snowboard(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        self.images = [pygame.image.load(f"assets\Snowboarder{i}.png") for i in range(1, 4)]
+        self.index = 0
+        self.counter = 0
+        self.image = self.images[self.index]
+        self.rect = self.image.get_rect(center=(x, y))
+        self.vel = 0
+        self.clicked = False
+
+    def update(self):
+        if snowboarding:
+            self.vel = min(self.vel + 0.5, 8)
+            self.rect.y += int(self.vel)
+            
+        if not Game_over:
+            if pygame.mouse.get_pressed()[0] and not self.clicked:
+                self.clicked = True
+                self.vel = -10
+            if not pygame.mouse.get_pressed()[0]:
+                self.clicked = False
+            self.counter += 1
+            if self.counter > 5:
+                self.counter = 0
+                self.index = (self.index + 1) % len(self.images)
+            self.image = pygame.transform.rotate(self.images[self.index], self.vel * -2)
+        else:
+            self.image = pygame.transform.rotate(self.images[self.index], -90)
+
+class tree(pygame.sprite.Sprite):
+    def __init__(self, x, y, pos):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.image.load("assets\Tree.png")
+        if pos == 1:
+            self.image = pygame.transform.flip(self.image, False, True)
+            self.rect = self.image.get_rect(bottomleft=(x, y - tree_gap // 2))
+        else:
+            self.rect = self.image.get_rect(topleft=(x, y + tree_gap // 2))
+    def update(self):
+        self.rect.x -= scroll_speed
+        if self.rect.right < 0:
+            self.kill()
+
+class Button():
+    def __init__(self, x, y, img):
+        self.image = img
+        self.rect = self.image.get_rect(topleft=(x, y))
+        
+    def draw(self):
+        pos = pygame.mouse.get_pos()#to get the CURRENT pos of the mouse
+        if self.rect.collidepoint(pos) and pygame.mouse.get_pressed()[0]:
+            return True
+        screen.blit(self.image, self.rect)
+        return False
+
+# Sprite groups
+snowboard_group = pygame.sprite.Group()
+tree_group = pygame.sprite.Group()
+
+# Objects of the class snowboard
+snowboarder = Snowboard(100, H // 2)
+snowboard_group.add(snowboarder)
+Restart_button = Button(W // 2 - 50, H // 2 - 80, restart)
+
+Clock = pygame.time.Clock()
+running = True
+
+while running:
+    Clock.tick(fps)
+    screen.blit(Bg, (0, 0))
+    if not Game_over and snowboarding:
+        time_now = pygame.time.get_ticks()
+
+        if time_now - last_tree > tree_freq:
+            tree_height = random.randint(-100, 100)
+            tree(W, H // 2 + tree_height, -1).add(tree_group)#this is for the bottom/lower tree
+            tree(W, H // 2 + tree_height, 1).add(tree_group)#this is for the top/upper tree
+            last_tree = time_now
+
+        ground_scroll = (ground_scroll - scroll_speed) % 35
+        tree_group
+    screen.blit(ground_img, (ground_scroll, 420))
+    snowboard_group.update()
+    snowboard_group.draw(screen)
+    tree_group.draw(screen)
+    draw_text(str(score), font, white, W // 2, 20)
+    if (tree_group)\
+        and (snowboarder.rect.left > tree_group.sprites()[0].rect.left)\
+        and (snowboarder.rect.right < tree_group.sprites()[0].rect.right)\
+        and (not passed_tree):
+        passed_tree = True
+    
+    if (passed_tree and tree_group)\
+        and (snowboarder.rect.left > tree_group.sprites()[0].rect.right):
+        score += 1
+        passed_tree = False
+    if pygame.sprite.groupcollide(snowboard_group, tree_group, False, False) or snowboarder.rect.top < 0\
+        or snowboarder.rect.bottom >=570:
+            Game_over = True
+            snowboarding = False
+    if Game_over:
+        if Restart_button.draw():
+            reset_game()
+            Game_over = False
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        if event.type == pygame.MOUSEBUTTONDOWN and not snowboarding and not Game_over:
+            snowboarding = True
+
+    pygame.display.update()
+
+pygame.quit()
